@@ -130,28 +130,53 @@ if edited_prompt != current_user_profile.get("system_prompt"):
     save_data(app_state)
     st.sidebar.caption("💾 プロンプトを自動保存しました")
 
-st.sidebar.markdown("---")
+# --- 共通キャッシュ関数 ---
+@st.cache_data(ttl=60)
+def get_ollama_models(base_url: str):
+    """ローカルOllamaにインストールされているモデル一覧を自動取得"""
+    try:
+        res = requests.get(f"{base_url.rstrip('/')}/api/tags", timeout=3)
+        if res.status_code == 200:
+            names = [m["name"] for m in res.json().get("models", [])]
+            if names:
+                return names
+    except Exception:
+        pass
+    return ["qwen2.5:7b", "deepseek-r1:8b", "llama3.3", "mistral"]
 
 # クラウド公開用 API / ローカル切替設定
-st.sidebar.header("🌐 AIエンジン・API設定")
+st.sidebar.header("🌐 AIエンジン・モデル設定")
 llm_provider = st.sidebar.selectbox(
     "AIプロバイダー",
     ["Ollama (ローカル)", "Google Gemini API (クラウド)", "Groq API (高速クラウド)", "OpenAI互換 API"],
     index=0,
-    help="クラウドにアプリを公開する場合は Gemini や Groq のAPIキーを使用できます。"
+    help="お友達のPC（RTX 4070など）で動かす場合は Ollama を選択し、好きなモデルを選べます。"
 )
 
 api_key = ""
 custom_model = ""
+temperature = st.sidebar.slider("AIの温度 (リスク志向・創造性)", min_value=0.0, max_value=1.0, value=0.3, step=0.1, help="低いほど論理的・堅実、高いほど積極的・柔軟な分析になります。")
+
 if llm_provider == "Ollama (ローカル)":
     ollama_url = st.sidebar.text_input("Ollama URL", value="http://localhost:11434")
-    ollama_model = st.sidebar.text_input("モデル名", value="qwen2.5:7b")
+    detected_models = get_ollama_models(ollama_url)
+    model_choice_mode = st.sidebar.radio("モデル指定", ["検出されたモデルから選択", "自由に入力"], horizontal=True)
+    if model_choice_mode == "検出されたモデルから選択":
+        ollama_model = st.sidebar.selectbox("使用モデル", detected_models, index=0)
+    else:
+        ollama_model = st.sidebar.text_input("モデル名を手動入力", value="qwen2.5:7b")
+    st.sidebar.caption(f"💡 RTX 4070なら `qwen2.5:14b` や `deepseek-r1:8b` も超高速で動作します！")
+
 elif llm_provider == "Google Gemini API (クラウド)":
     api_key = st.sidebar.text_input("Gemini API Key", type="password", help="Google AI Studioで取得したAPIキー")
-    custom_model = st.sidebar.text_input("モデル名", value="gemini-1.5-flash")
+    gemini_options = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
+    custom_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=0)
+
 elif llm_provider == "Groq API (高速クラウド)":
     api_key = st.sidebar.text_input("Groq API Key", type="password", help="Groq Consoleで取得したAPIキー")
-    custom_model = st.sidebar.text_input("モデル名", value="llama-3.3-70b-versatile")
+    groq_options = ["llama-3.3-70b-versatile", "qwen-2.5-32b", "deepseek-r1-distill-llama-70b", "gemma2-9b-it"]
+    custom_model = st.sidebar.selectbox("Groq モデル", groq_options, index=0)
+
 else:
     api_key = st.sidebar.text_input("API Key", type="password")
     custom_url = st.sidebar.text_input("Endpoint URL", value="https://api.openai.com/v1/chat/completions")
@@ -220,7 +245,13 @@ def request_llm(prompt_text: str):
     if llm_provider == "Ollama (ローカル)":
         endpoint = f"{ollama_url.rstrip('/')}/api/generate"
         try:
-            res = requests.post(endpoint, json={"model": ollama_model, "prompt": prompt_text, "stream": False}, timeout=90)
+            payload = {
+                "model": ollama_model,
+                "prompt": prompt_text,
+                "stream": False,
+                "options": {"temperature": float(temperature)}
+            }
+            res = requests.post(endpoint, json=payload, timeout=90)
             res.raise_for_status()
             return res.json().get("response", "")
         except requests.exceptions.ConnectionError:
@@ -233,7 +264,10 @@ def request_llm(prompt_text: str):
             return "⚠️ Gemini APIキーが設定されていません。サイドバーに入力してください。"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{custom_model}:generateContent?key={api_key}"
         try:
-            payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
+            payload = {
+                "contents": [{"parts": [{"text": prompt_text}]}],
+                "generationConfig": {"temperature": float(temperature)}
+            }
             res = requests.post(url, json=payload, timeout=60)
             res.raise_for_status()
             data = res.json()
@@ -247,7 +281,11 @@ def request_llm(prompt_text: str):
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         try:
-            payload = {"model": custom_model, "messages": [{"role": "user", "content": prompt_text}]}
+            payload = {
+                "model": custom_model,
+                "messages": [{"role": "user", "content": prompt_text}],
+                "temperature": float(temperature)
+            }
             res = requests.post(url, headers=headers, json=payload, timeout=60)
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"]
@@ -259,7 +297,11 @@ def request_llm(prompt_text: str):
             return "⚠️ APIキーが設定されていません。サイドバーに入力してください。"
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         try:
-            payload = {"model": custom_model, "messages": [{"role": "user", "content": prompt_text}]}
+            payload = {
+                "model": custom_model,
+                "messages": [{"role": "user", "content": prompt_text}],
+                "temperature": float(temperature)
+            }
             res = requests.post(custom_url, headers=headers, json=payload, timeout=60)
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"]
