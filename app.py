@@ -207,9 +207,11 @@ elif llm_provider == "Google Gemini API (クラウド)":
         st.sidebar.success("✅ Gemini APIキーは設定済みです（入力不要）")
     else:
         api_key = st.sidebar.text_input("Gemini API Key", type="password", help="Google AI Studioで取得したAPIキー")
-    gemini_options = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
+    # gemini-1.5-proは無料枠では利用不可のため除外
+    gemini_options = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     default_gemini_idx = gemini_options.index(SECRET_GEMINI_MODEL) if SECRET_GEMINI_MODEL in gemini_options else 0
     custom_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=default_gemini_idx)
+    st.sidebar.caption("💡 無料枠で使えるモデルのみ表示しています")
 
 elif llm_provider == "Groq API (高速クラウド)":
     if has_groq_secret:
@@ -306,18 +308,32 @@ def request_llm(prompt_text: str):
     elif llm_provider == "Google Gemini API (クラウド)":
         if not api_key:
             return "⚠️ Gemini APIキーが設定されていません。サイドバーに入力してください。"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{custom_model}:generateContent?key={api_key}"
-        try:
-            payload = {
-                "contents": [{"parts": [{"text": prompt_text}]}],
-                "generationConfig": {"temperature": float(temperature)}
-            }
-            res = requests.post(url, json=payload, timeout=60)
-            res.raise_for_status()
-            data = res.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception as e:
-            return f"⚠️ Gemini APIエラー: {e}"
+        # 新旧両方のキー形式（AIza... / AQ.）に対応するためヘッダーで認証
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "contents": [{"parts": [{"text": prompt_text}]}],
+            "generationConfig": {"temperature": float(temperature)}
+        }
+        # v1 → v1beta の順で試みる
+        for api_version in ["v1beta", "v1"]:
+            url = f"https://generativelanguage.googleapis.com/{api_version}/models/{custom_model}:generateContent"
+            try:
+                res = requests.post(url, headers=headers, json=payload, timeout=60)
+                if res.status_code == 404:
+                    continue  # 次のバージョンを試す
+                res.raise_for_status()
+                data = res.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except requests.exceptions.HTTPError as e:
+                if res.status_code == 404:
+                    continue
+                return f"⚠️ Gemini APIエラー ({api_version}): {e}"
+            except Exception as e:
+                return f"⚠️ Gemini APIエラー: {e}"
+        return f"⚠️ Gemini APIエラー: モデル '{custom_model}' が見つかりませんでした。別のモデルをお試しください。"
 
     elif llm_provider == "Groq API (高速クラウド)":
         if not api_key:
