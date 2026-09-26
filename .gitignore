@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 env/
 .env
+# Streamlit Secrets（APIキーを含む機密ファイル - 絶対にGitHubに上げない）
+.streamlit/secrets.toml

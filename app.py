@@ -146,17 +146,49 @@ def get_ollama_models(base_url: str):
         pass
     return ["qwen2.5:7b", "deepseek-r1:8b", "llama3.3", "mistral"]
 
+# --- Streamlit Secretsからキーを自動取得 ---
+def get_secret(key: str, section: str = "api_keys", fallback: str = "") -> str:
+    """Streamlit SecretsまたはSectionから安全にキーを取得"""
+    try:
+        return st.secrets[section][key]
+    except (KeyError, FileNotFoundError):
+        return fallback
+
+# Secretsに設定済みのキーを確認
+SECRET_GEMINI_KEY = get_secret("GEMINI_API_KEY")
+SECRET_GROQ_KEY = get_secret("GROQ_API_KEY")
+SECRET_DEFAULT_PROVIDER = get_secret("default_provider", section="settings", fallback="")
+SECRET_GEMINI_MODEL = get_secret("default_gemini_model", section="settings", fallback="gemini-1.5-flash")
+SECRET_GROQ_MODEL = get_secret("default_groq_model", section="settings", fallback="llama-3.3-70b-versatile")
+
+# クラウドにSecretsが設定されているか確認
+has_gemini_secret = bool(SECRET_GEMINI_KEY and SECRET_GEMINI_KEY != "ここにGemini APIキーを貼り付け")
+has_groq_secret = bool(SECRET_GROQ_KEY and SECRET_GROQ_KEY != "ここにGroq APIキーを貼り付け")
+
+# デフォルトプロバイダーの決定（Secrets設定 > ローカルOllama）
+if SECRET_DEFAULT_PROVIDER == "gemini" and has_gemini_secret:
+    default_provider_index = 1
+elif SECRET_DEFAULT_PROVIDER == "groq" and has_groq_secret:
+    default_provider_index = 2
+elif has_gemini_secret:
+    default_provider_index = 1
+elif has_groq_secret:
+    default_provider_index = 2
+else:
+    default_provider_index = 0  # ローカルOllamaがデフォルト
+
 # クラウド公開用 API / ローカル切替設定
 st.sidebar.header("🌐 AIエンジン・モデル設定")
 llm_provider = st.sidebar.selectbox(
     "AIプロバイダー",
     ["Ollama (ローカル)", "Google Gemini API (クラウド)", "Groq API (高速クラウド)", "OpenAI互換 API"],
-    index=0,
-    help="お友達のPC（RTX 4070など）で動かす場合は Ollama を選択し、好きなモデルを選べます。"
+    index=default_provider_index,
+    help="お友達のPC（RTX 4070など）で動かす場合は Ollama を選択できます。"
 )
 
 api_key = ""
 custom_model = ""
+custom_url = ""
 temperature = st.sidebar.slider("AIの温度 (リスク志向・創造性)", min_value=0.0, max_value=1.0, value=0.3, step=0.1, help="低いほど論理的・堅実、高いほど積極的・柔軟な分析になります。")
 
 if llm_provider == "Ollama (ローカル)":
@@ -167,17 +199,27 @@ if llm_provider == "Ollama (ローカル)":
         ollama_model = st.sidebar.selectbox("使用モデル", detected_models, index=0)
     else:
         ollama_model = st.sidebar.text_input("モデル名を手動入力", value="qwen2.5:7b")
-    st.sidebar.caption(f"💡 RTX 4070なら `qwen2.5:14b` や `deepseek-r1:8b` も超高速で動作します！")
+    st.sidebar.caption("💡 RTX 4070なら `qwen2.5:14b` や `deepseek-r1:8b` も超高速で動作します！")
 
 elif llm_provider == "Google Gemini API (クラウド)":
-    api_key = st.sidebar.text_input("Gemini API Key", type="password", help="Google AI Studioで取得したAPIキー")
+    if has_gemini_secret:
+        api_key = SECRET_GEMINI_KEY
+        st.sidebar.success("✅ Gemini APIキーは設定済みです（入力不要）")
+    else:
+        api_key = st.sidebar.text_input("Gemini API Key", type="password", help="Google AI Studioで取得したAPIキー")
     gemini_options = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
-    custom_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=0)
+    default_gemini_idx = gemini_options.index(SECRET_GEMINI_MODEL) if SECRET_GEMINI_MODEL in gemini_options else 0
+    custom_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=default_gemini_idx)
 
 elif llm_provider == "Groq API (高速クラウド)":
-    api_key = st.sidebar.text_input("Groq API Key", type="password", help="Groq Consoleで取得したAPIキー")
+    if has_groq_secret:
+        api_key = SECRET_GROQ_KEY
+        st.sidebar.success("✅ Groq APIキーは設定済みです（入力不要）")
+    else:
+        api_key = st.sidebar.text_input("Groq API Key", type="password", help="Groq Consoleで取得したAPIキー")
     groq_options = ["llama-3.3-70b-versatile", "qwen-2.5-32b", "deepseek-r1-distill-llama-70b", "gemma2-9b-it"]
-    custom_model = st.sidebar.selectbox("Groq モデル", groq_options, index=0)
+    default_groq_idx = groq_options.index(SECRET_GROQ_MODEL) if SECRET_GROQ_MODEL in groq_options else 0
+    custom_model = st.sidebar.selectbox("Groq モデル", groq_options, index=default_groq_idx)
 
 else:
     api_key = st.sidebar.text_input("API Key", type="password")
