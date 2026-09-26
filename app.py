@@ -9,6 +9,8 @@ import feedparser
 from bs4 import BeautifulSoup
 import urllib.parse
 from datetime import datetime
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ページ設定
 st.set_page_config(
@@ -399,11 +401,76 @@ with col_left:
     m3.metric("期間最安値", f"{df['Low'].min():,.2f}{currency_symbol}")
     m4.metric("直近出来高", f"{int(df['Volume'].iloc[-1]):,} 株")
 
-    # チャート表示
-    chart_df = df[["Close"]].copy()
-    chart_df.index = chart_df.index.strftime("%Y-%m-%d")
-    chart_df.rename(columns={"Close": "終値"}, inplace=True)
-    st.line_chart(chart_df, height=260)
+    # チャート表示形式の切替
+    c_type1, c_type2 = st.columns([1.2, 1])
+    with c_type1:
+        chart_style = st.radio("表示スタイル", ["ローソク足", "エリア折れ線"], horizontal=True, label_visibility="collapsed")
+    with c_type2:
+        show_ma = st.checkbox("移動平均線 (5日/25日)", value=True)
+
+    # Plotlyでローソク足 ＋ 出来高チャートを構築
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.04,
+        row_heights=[0.75, 0.25]
+    )
+
+    dates = df.index.strftime("%Y-%m-%d")
+
+    if chart_style == "ローソク足":
+        fig.add_trace(
+            go.Candlestick(
+                x=dates,
+                open=df["Open"],
+                high=df["High"],
+                low=df["Low"],
+                close=df["Close"],
+                name="株価",
+                increasing_line_color="#00C805",
+                decreasing_line_color="#FF333A"
+            ),
+            row=1, col=1
+        )
+    else:
+        fig.add_trace(
+            go.Scatter(
+                x=dates,
+                y=df["Close"],
+                mode="lines",
+                name="終値",
+                line=dict(color="#2962FF", width=2),
+                fill="tozeroy",
+                fillcolor="rgba(41, 98, 255, 0.1)"
+            ),
+            row=1, col=1
+        )
+
+    # 移動平均線
+    if show_ma:
+        if len(df) >= 5:
+            ma5 = df["Close"].rolling(5).mean()
+            fig.add_trace(go.Scatter(x=dates, y=ma5, mode="lines", name="5日線", line=dict(color="#FF9800", width=1.5)), row=1, col=1)
+        if len(df) >= 25:
+            ma25 = df["Close"].rolling(25).mean()
+            fig.add_trace(go.Scatter(x=dates, y=ma25, mode="lines", name="25日線", line=dict(color="#9C27B0", width=1.5)), row=1, col=1)
+
+    # 出来高バー
+    vol_colors = ["#00C805" if c >= o else "#FF333A" for c, o in zip(df["Close"], df["Open"])]
+    fig.add_trace(
+        go.Bar(x=dates, y=df["Volume"], name="出来高", marker_color=vol_colors, opacity=0.6),
+        row=2, col=1
+    )
+
+    fig.update_layout(
+        height=320,
+        margin=dict(l=0, r=0, t=10, b=0),
+        xaxis_rangeslider_visible=False,
+        hovermode="x unified",
+        template="plotly_dark",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig, width="stretch")
 
     # 左側タブ: AI分析 / 参照ニュース / 手動トレード
     tab_ai, tab_news, tab_trade = st.tabs(["🧠 AI投資分析 (RAG)", "📰 参照ニュース", "⚡ 手動トレード"])
