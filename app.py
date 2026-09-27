@@ -250,17 +250,7 @@ elif llm_provider == "Google Gemini API (クラウド)":
         help="Google AI Studio (https://aistudio.google.com/) で取得したご自身のAPIキーを入力してください"
     )
 
-    # APIキー入力時に利用可能なモデル一覧を確認・検証
-    if api_key.strip() and HAS_GENAI_SDK:
-        try:
-            genai.configure(api_key=api_key.strip())
-            models = [m.name for m in genai.list_models()]
-            with st.sidebar.expander("📋 現在このキーで利用可能なモデル一覧", expanded=False):
-                st.write(models)
-        except Exception as e:
-            st.sidebar.error(f"モデル一覧の取得に失敗（認証エラーの可能性）: {e}")
-
-    gemini_options = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+    gemini_options = ["gemini-2.5-flash", "gemini-3.5-flash"]
     selected_gemini_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=0)
     # 必ず models/ プレフィックスを付与して保持
     custom_model = f"models/{selected_gemini_model}" if not selected_gemini_model.startswith("models/") else selected_gemini_model
@@ -369,7 +359,7 @@ def request_llm(prompt_text: str, provider: str, current_api_key: str, model_nam
         # モデル名に必ず models/ プレフィックスを保証
         clean_model = (model_name or "").strip()
         if not clean_model:
-            clean_model = "gemini-1.5-flash"
+            clean_model = "gemini-2.5-flash"
         formatted_model = clean_model if clean_model.startswith("models/") else f"models/{clean_model}"
 
         # ボタンが押されたその瞬間に画面のキーで直接 genai.configure を実行
