@@ -204,12 +204,19 @@ def get_ollama_models(base_url: str):
         pass
     return ["qwen2.5:7b", "deepseek-r1:8b", "llama3.3", "mistral"]
 
-# --- Google Gemini SDK (利用可能な場合) のインポート ---
+# --- Google GenAI SDK (最新公式SDK) および 旧SDKのインポート ---
 try:
-    import google.generativeai as genai
-    HAS_GENAI_SDK = True
+    from google import genai as modern_genai
+    from google.genai import types as modern_genai_types
+    HAS_MODERN_GENAI = True
 except ImportError:
-    HAS_GENAI_SDK = False
+    HAS_MODERN_GENAI = False
+
+try:
+    import google.generativeai as legacy_genai
+    HAS_LEGACY_GENAI = True
+except ImportError:
+    HAS_LEGACY_GENAI = False
 
 # クラウド版は Gemini / Groq をデフォルト（Ollama はローカルのみ）
 if IS_CLOUD:
@@ -252,8 +259,7 @@ elif llm_provider == "Google Gemini API (クラウド)":
 
     gemini_options = ["gemini-2.5-flash", "gemini-3.5-flash"]
     selected_gemini_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=0)
-    # 必ず models/ プレフィックスを付与して保持
-    custom_model = f"models/{selected_gemini_model}" if not selected_gemini_model.startswith("models/") else selected_gemini_model
+    custom_model = selected_gemini_model
     st.sidebar.caption(f"💡 適用モデル: `{custom_model}`")
 
 elif llm_provider == "Groq API (高速クラウド)":
@@ -356,25 +362,41 @@ def request_llm(prompt_text: str, provider: str, current_api_key: str, model_nam
         if not clean_key:
             return "⚠️ Gemini APIキーが入力されていません。サイドバーの「Gemini API Key」欄にご自身のAPIキーを入力してください。"
 
-        # モデル名に必ず models/ プレフィックスを保証
-        clean_model = (model_name or "").strip()
-        if not clean_model:
-            clean_model = "gemini-2.5-flash"
-        formatted_model = clean_model if clean_model.startswith("models/") else f"models/{clean_model}"
+        # モデル名から "models/" プレフィックスを正規化（二重プレフィックス防止）
+        raw_model = (model_name or "").strip() or "gemini-2.5-flash"
+        model_without_prefix = raw_model[7:] if raw_model.startswith("models/") else raw_model
+        model_with_prefix = raw_model if raw_model.startswith("models/") else f"models/{raw_model}"
 
-        # ボタンが押されたその瞬間に画面のキーで直接 genai.configure を実行
-        if HAS_GENAI_SDK:
+        # 1. Google GenAI SDK（最新の公式Clientベース: Gemini 2.5 / 3.5 / 3.8対応）
+        if HAS_MODERN_GENAI:
             try:
-                genai.configure(api_key=clean_key)
-                model_inst = genai.GenerativeModel(formatted_model)
-                gen_config = genai.types.GenerationConfig(temperature=float(temp))
-                response = model_inst.generate_content(prompt_text, generation_config=gen_config)
+                client = modern_genai.Client(api_key=clean_key)
+                cfg = modern_genai_types.GenerateContentConfig(temperature=float(temp))
+                response = client.models.generate_content(
+                    model=model_without_prefix,
+                    contents=prompt_text,
+                    config=cfg
+                )
                 if response and response.text:
                     return response.text
             except Exception:
-                pass  # SDK失敗時はREST APIにフォールバック
+                pass  # 旧SDKまたはREST APIにフォールバック
 
-        # REST API 直接呼び出し（新旧キー/AQ.キー/AIzaキー両対応）
+        # 2. 旧 Google Generative AI SDK によるフォールバック
+        if HAS_LEGACY_GENAI:
+            try:
+                legacy_genai.configure(api_key=clean_key)
+                model_inst = legacy_genai.GenerativeModel(model_with_prefix)
+                response = model_inst.generate_content(
+                    prompt_text,
+                    generation_config={"temperature": float(temp)}
+                )
+                if response and response.text:
+                    return response.text
+            except Exception:
+                pass
+
+        # 3. 最新 REST API 直接呼び出し（v1 正規版優先 → v1beta）
         headers = {
             "x-goog-api-key": clean_key,
             "Content-Type": "application/json"
@@ -383,8 +405,8 @@ def request_llm(prompt_text: str, provider: str, current_api_key: str, model_nam
             "contents": [{"parts": [{"text": prompt_text}]}],
             "generationConfig": {"temperature": float(temp)}
         }
-        for api_version in ["v1beta", "v1"]:
-            url = f"https://generativelanguage.googleapis.com/{api_version}/{formatted_model}:generateContent?key={clean_key}"
+        for api_version in ["v1", "v1beta"]:
+            url = f"https://generativelanguage.googleapis.com/{api_version}/models/{model_without_prefix}:generateContent?key={clean_key}"
             try:
                 res = requests.post(url, headers=headers, json=payload, timeout=60)
                 if res.status_code == 404:
@@ -399,7 +421,7 @@ def request_llm(prompt_text: str, provider: str, current_api_key: str, model_nam
             except Exception as e:
                 return f"⚠️ Gemini APIエラー: {e}"
 
-        return f"⚠️ Gemini APIエラー: モデル '{formatted_model}' が見つかりませんでした (404)。サイドバーで別のモデルをお試しください。"
+        return f"⚠️ Gemini APIエラー: モデル '{model_without_prefix}' が見つかりませんでした (404)。Google AI Studioで有効化されているモデルかご確認ください。"
 
     elif provider == "Groq API (高速クラウド)":
         clean_key = (current_api_key or "").strip()
