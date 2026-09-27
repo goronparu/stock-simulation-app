@@ -1,16 +1,361 @@
 {
-  "User_A (慎重型)": {
-    "system_prompt": "あなたはリスク管理を最優先する慎重な投資アナリストです。テクニカル指標の過熱感やニュースのリスク要因を厳しく評価し、確実性が極めて高いと判断した場合のみ『買い』と提示してください。疑わしい材料や高値圏では迷わず『様子見』または『売り』を選択してください。",
-    "cash": 1000000.0,
-    "initial_cash": 1000000.0,
-    "holdings": {},
-    "history": []
+  "users": {
+    "User_A (慎重型)": {
+      "system_prompt": "あなたはリスク管理を最優先する慎重な投資アナリストです。テクニカル指標の過熱感やニュースのリスク要因を厳しく評価し、確実性が極めて高いと判断した場合のみ『買い』と提示してください。疑わしい材料や高値圏では迷わず『様子見』または『売り』を選択してください。",
+      "cash": 17835.99853515625,
+      "initial_cash": 1000000.0,
+      "holdings": {
+        "7203.T": {
+          "shares": 100,
+          "avg_price": 2989.5,
+          "name": "TOYOTA MOTOR CORP"
+        },
+        "9984.T": {
+          "shares": 100,
+          "avg_price": 6150.0,
+          "name": "ソフトバンクG"
+        },
+        "AAPL": {
+          "shares": 200,
+          "avg_price": 341.07,
+          "name": "Apple Inc."
+        }
+      },
+      "history": [
+        {
+          "timestamp": "2026-09-27 13:08:13",
+          "symbol": "7203.T",
+          "name": "TOYOTA MOTOR CORP",
+          "action": "BUY",
+          "shares": 100,
+          "price": 2989.5,
+          "total": 298950.0,
+          "cash_after": 17836.0
+        },
+        {
+          "timestamp": "2026-09-27 13:08:11",
+          "symbol": "7203.T",
+          "name": "TOYOTA MOTOR CORP",
+          "action": "SELL",
+          "shares": 100,
+          "price": 2989.5,
+          "total": 298950.0,
+          "profit": 0.0,
+          "cash_after": 316786.0
+        },
+        {
+          "timestamp": "2026-09-27 00:03:24",
+          "symbol": "AAPL",
+          "name": "Apple Inc.",
+          "action": "BUY",
+          "shares": 100,
+          "price": 341.07,
+          "total": 34107.0,
+          "cash_after": 17836.0
+        },
+        {
+          "timestamp": "2026-09-27 00:03:24",
+          "symbol": "AAPL",
+          "name": "Apple Inc.",
+          "action": "BUY",
+          "shares": 100,
+          "price": 341.07,
+          "total": 34107.0,
+          "cash_after": 51943.0
+        },
+        {
+          "timestamp": "2026-09-26 23:18:50",
+          "symbol": "9984.T",
+          "name": "ソフトバンクG",
+          "action": "BUY",
+          "shares": 100,
+          "price": 6150.0,
+          "total": 615000.0,
+          "cash_after": 86050.0
+        },
+        {
+          "timestamp": "2026-09-26 23:18:48",
+          "symbol": "7203.T",
+          "name": "トヨタ自動車",
+          "action": "BUY",
+          "shares": 100,
+          "price": 2989.5,
+          "total": 298950.0,
+          "cash_after": 701050.0
+        }
+      ]
+    },
+    "User_B (積極型)": {
+      "system_prompt": "あなたは成長性と上昇モメンタムを重視する積極的な投資アナリストです。将来性や好材料ニュース、ブレイクアウトの兆候を前向きに捉え、上昇余地があれば多少のリスクを取ってでも積極的に『買い』と提示してください。",
+      "cash": 86050.0,
+      "initial_cash": 1000000.0,
+      "holdings": {
+        "7203.T": {
+          "shares": 100,
+          "avg_price": 2989.5,
+          "name": "トヨタ自動車"
+        },
+        "9984.T": {
+          "shares": 100,
+          "avg_price": 6150.0,
+          "name": "ソフトバンクG"
+        }
+      },
+      "history": [
+        {
+          "timestamp": "2026-09-27 13:08:04",
+          "symbol": "9984.T",
+          "name": "ソフトバンクG",
+          "action": "BUY",
+          "shares": 100,
+          "price": 6150.0,
+          "total": 615000.0,
+          "cash_after": 86050.0
+        },
+        {
+          "timestamp": "2026-09-27 13:08:04",
+          "symbol": "7203.T",
+          "name": "トヨタ自動車",
+          "action": "BUY",
+          "shares": 100,
+          "price": 2989.5,
+          "total": 298950.0,
+          "cash_after": 701050.0
+        }
+      ]
+    }
   },
-  "User_B (積極型)": {
-    "system_prompt": "あなたは成長性と上昇モメンタムを重視する積極的な投資アナリストです。将来性や好材料ニュース、ブレイクアウトの兆候を前向きに捉え、上昇余地があれば多少のリスクを取ってでも積極的に『買い』と提示してください。",
-    "cash": 1000000.0,
-    "initial_cash": 1000000.0,
-    "holdings": {},
-    "history": []
-  }
+  "timeline": [
+    {
+      "time": "13:08:13",
+      "user": "User_A (慎重型)",
+      "type": "BUY",
+      "title": "買付: TOYOTA MOTOR CORP 100株",
+      "detail": "約定: 2,989.5円 (計: 298,950円)"
+    },
+    {
+      "time": "13:08:11",
+      "user": "User_A (慎重型)",
+      "type": "SELL",
+      "title": "売却: TOYOTA MOTOR CORP 100株",
+      "detail": "損益: +0円 (約定: 2,989.5円)"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_B (積極型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソフトバンクG",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_B (積極型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: 任天堂",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_B (積極型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソニーグループ",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_B (積極型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: トヨタ自動車",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソフトバンクG",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: 任天堂",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソニーグループ",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:05",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: トヨタ自動車",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_B (積極型)",
+      "type": "BUY",
+      "title": "🤖 自動買付: ソフトバンクG 100株",
+      "detail": "約定: 6,150.0円 (AIシグナル: 買い)"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_B (積極型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: 任天堂",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_B (積極型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソニーグループ",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_B (積極型)",
+      "type": "BUY",
+      "title": "🤖 自動買付: トヨタ自動車 100株",
+      "detail": "約定: 2,989.5円 (AIシグナル: 買い)"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソフトバンクG",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: 任天堂",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソニーグループ",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:04",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: トヨタ自動車",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:00",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソフトバンクG",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:00",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: 任天堂",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:00",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソニーグループ",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:08:00",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: トヨタ自動車",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "13:07:47",
+      "user": "User_A (慎重型)",
+      "type": "AI_ANALYSIS",
+      "title": "AI判断: 【売り】 推奨",
+      "detail": "TOYOTA MOTOR CORP (7203.T) @ 2,989.5円"
+    },
+    {
+      "time": "00:33:51",
+      "user": "User_A (慎重型)",
+      "type": "AI_ANALYSIS",
+      "title": "AI判断: 【様子見】 推奨",
+      "detail": "TOYOTA MOTOR CORP (7203.T) @ 2,989.5円"
+    },
+    {
+      "time": "00:03:46",
+      "user": "User_A (慎重型)",
+      "type": "AI_ANALYSIS",
+      "title": "AI判断: 【売り】 推奨",
+      "detail": "Apple Inc. (AAPL) @ 341.1円"
+    },
+    {
+      "time": "00:03:24",
+      "user": "User_A (慎重型)",
+      "type": "BUY",
+      "title": "買付: Apple Inc. 100株",
+      "detail": "約定: 341.1円 (計: 34,107円)"
+    },
+    {
+      "time": "00:03:24",
+      "user": "User_A (慎重型)",
+      "type": "BUY",
+      "title": "買付: Apple Inc. 100株",
+      "detail": "約定: 341.1円 (計: 34,107円)"
+    },
+    {
+      "time": "00:00:56",
+      "user": "User_A (慎重型)",
+      "type": "AI_ANALYSIS",
+      "title": "AI判断: 【様子見】 推奨",
+      "detail": "TOYOTA MOTOR CORP (7203.T) @ 2,989.5円"
+    },
+    {
+      "time": "23:18:47",
+      "user": "User_A (慎重型)",
+      "type": "BUY",
+      "title": "🤖 自動買付: ソフトバンクG 100株",
+      "detail": "約定: 6,150.0円 (AIシグナル: 買い)"
+    },
+    {
+      "time": "23:18:47",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: 任天堂",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "23:18:47",
+      "user": "User_A (慎重型)",
+      "type": "HOLD",
+      "title": "🤖 様子見: ソニーグループ",
+      "detail": "条件不一致または資金/株数不足のため見送り"
+    },
+    {
+      "time": "23:18:47",
+      "user": "User_A (慎重型)",
+      "type": "BUY",
+      "title": "🤖 自動買付: トヨタ自動車 100株",
+      "detail": "約定: 2,989.5円 (AIシグナル: 買い)"
+    },
+    {
+      "time": "23:18:40",
+      "user": "User_A (慎重型)",
+      "type": "AI_ANALYSIS",
+      "title": "AI判断: 【様子見】 推奨",
+      "detail": "TOYOTA MOTOR CORP (7203.T) @ 2,989.5円"
+    }
+  ]
 }
