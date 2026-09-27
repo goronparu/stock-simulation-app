@@ -204,61 +204,12 @@ def get_ollama_models(base_url: str):
         pass
     return ["qwen2.5:7b", "deepseek-r1:8b", "llama3.3", "mistral"]
 
-# --- Google Gemini SDK (利用可能な場合) または REST API の初期化・設定 ---
+# --- Google Gemini SDK (利用可能な場合) のインポート ---
 try:
     import google.generativeai as genai
     HAS_GENAI_SDK = True
 except ImportError:
     HAS_GENAI_SDK = False
-
-def is_valid_api_key(key: str) -> bool:
-    """キーが有効な形式（非空かつASCIIのみ、プレースホルダー除外）か判定"""
-    if not key or not isinstance(key, str):
-        return False
-    clean = key.strip()
-    if "ここに" in clean or "your_" in clean.lower() or "api_key" in clean.lower():
-        return False
-    # 非ASCII文字（日本語等）が含まれている場合は無効
-    if any(ord(c) > 127 for c in clean):
-        return False
-    return len(clean) >= 10
-
-def get_secret(key: str, section: str = "api_keys", fallback: str = "") -> str:
-    """Streamlit Secretsから安全に有効なキーを取得（プレースホルダー除外）"""
-    try:
-        val = ""
-        if section and section in st.secrets and key in st.secrets[section]:
-            val = str(st.secrets[section][key]).strip()
-        elif key in st.secrets:
-            val = str(st.secrets[key]).strip()
-        if is_valid_api_key(val):
-            return val
-    except Exception:
-        pass
-    return fallback
-
-def format_gemini_model_name(model_name: str) -> str:
-    """Gemini API / GenerativeModel用のモデル名フォーマット（models/ プレフィックスを保証）"""
-    clean_name = (model_name or "").strip()
-    if not clean_name:
-        return "models/gemini-1.5-flash"
-    if not clean_name.startswith("models/"):
-        return f"models/{clean_name}"
-    return clean_name
-
-def configure_gemini_key(key: str):
-    """APIキーが変更された際にSDKおよびセッション状態へ即座に反映"""
-    clean_key = (key or "").strip()
-    if is_valid_api_key(clean_key):
-        st.session_state["gemini_api_key"] = clean_key
-        if HAS_GENAI_SDK:
-            try:
-                genai.configure(api_key=clean_key)
-            except Exception:
-                pass
-        return clean_key
-    st.session_state["gemini_api_key"] = ""
-    return ""
 
 # クラウド版は Gemini / Groq をデフォルト（Ollama はローカルのみ）
 if IS_CLOUD:
@@ -293,40 +244,23 @@ if llm_provider == "Ollama (ローカル)":
     st.sidebar.caption("💡 RTX 4070なら `qwen2.5:14b` や `deepseek-r1:8b` も超高速で動作します！")
 
 elif llm_provider == "Google Gemini API (クラウド)":
-    secret_gemini_key = get_secret("GEMINI_API_KEY")
-    current_gemini_val = st.session_state.get("gemini_api_key", secret_gemini_key)
-    input_gemini_key = st.sidebar.text_input(
+    api_key = st.sidebar.text_input(
         "Gemini API Key",
-        value=current_gemini_val,
         type="password",
-        help="Google AI Studioで取得したAPIキー",
-        key="gemini_api_key_input"
+        help="Google AI Studio (https://aistudio.google.com/) で取得したご自身のAPIキーを入力してください"
     )
-    # キーが入力・変更されたタイミングで即座に設定反映
-    api_key = configure_gemini_key(input_gemini_key)
-    if secret_gemini_key and api_key == secret_gemini_key:
-        st.sidebar.caption("🔑 Secrets設定済みのAPIキーを使用中（手動変更も可能）")
-
     gemini_options = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     selected_gemini_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=0)
-    # 選択モデル名に自動で models/ プレフィックスを付与して保持
-    custom_model = format_gemini_model_name(selected_gemini_model)
-    st.sidebar.caption(f"💡 API/モデル識別子: `{custom_model}`")
+    # 必ず models/ プレフィックスを付与して保持
+    custom_model = f"models/{selected_gemini_model}" if not selected_gemini_model.startswith("models/") else selected_gemini_model
+    st.sidebar.caption(f"💡 適用モデル: `{custom_model}`")
 
 elif llm_provider == "Groq API (高速クラウド)":
-    secret_groq_key = get_secret("GROQ_API_KEY")
-    current_groq_val = st.session_state.get("groq_api_key", secret_groq_key)
-    input_groq_key = st.sidebar.text_input(
+    api_key = st.sidebar.text_input(
         "Groq API Key",
-        value=current_groq_val,
         type="password",
-        help="Groq Consoleで取得したAPIキー",
-        key="groq_api_key_input"
+        help="Groq Console (https://console.groq.com/) で取得したご自身のAPIキーを入力してください"
     )
-    api_key = (input_groq_key or "").strip()
-    st.session_state["groq_api_key"] = api_key
-    if secret_groq_key and api_key == secret_groq_key:
-        st.sidebar.caption("🔑 Secrets設定済みのAPIキーを使用中（手動変更も可能）")
     groq_options = ["llama-3.3-70b-versatile", "qwen-2.5-32b", "deepseek-r1-distill-llama-70b", "gemma2-9b-it"]
     custom_model = st.sidebar.selectbox("Groq モデル", groq_options, index=0)
 
@@ -398,15 +332,15 @@ def fetch_stock_news(query: str, max_items: int = 4):
     return news_items
 
 # --- 統一LLM呼び出し関数（Ollama / Gemini / Groq / OpenAI互換） ---
-def request_llm(prompt_text: str):
-    if llm_provider == "Ollama (ローカル)":
-        endpoint = f"{ollama_url.rstrip('/')}/api/generate"
+def request_llm(prompt_text: str, provider: str, current_api_key: str, model_name: str, temp: float, base_url: str = ""):
+    if provider == "Ollama (ローカル)":
+        endpoint = f"{base_url.rstrip('/')}/api/generate"
         try:
             payload = {
-                "model": ollama_model,
+                "model": model_name,
                 "prompt": prompt_text,
                 "stream": False,
-                "options": {"temperature": float(temperature)}
+                "options": {"temperature": float(temp)}
             }
             res = requests.post(endpoint, json=payload, timeout=90)
             res.raise_for_status()
@@ -416,39 +350,40 @@ def request_llm(prompt_text: str):
         except Exception as e:
             return f"⚠️ エラー: {e}"
 
-    elif llm_provider == "Google Gemini API (クラウド)":
-        active_key = (api_key or st.session_state.get("gemini_api_key", "")).strip()
-        if not active_key:
-            return "⚠️ Gemini APIキーが設定されていません。サイドバーに入力してください。"
+    elif provider == "Google Gemini API (クラウド)":
+        clean_key = (current_api_key or "").strip()
+        if not clean_key:
+            return "⚠️ Gemini APIキーが入力されていません。サイドバーの「Gemini API Key」欄にご自身のAPIキーを入力してください。"
 
-        # モデル名に確実に models/ プレフィックスを付与（例: models/gemini-1.5-flash）
-        formatted_model = format_gemini_model_name(custom_model)
+        # モデル名に必ず models/ プレフィックスを保証
+        clean_model = (model_name or "").strip()
+        if not clean_model:
+            clean_model = "gemini-1.5-flash"
+        formatted_model = clean_model if clean_model.startswith("models/") else f"models/{clean_model}"
 
-        # 1. Google Generative AI SDK (GenerativeModel) が利用可能な場合
+        # ボタンが押されたその瞬間に画面のキーで直接 genai.configure を実行
         if HAS_GENAI_SDK:
             try:
-                genai.configure(api_key=active_key)
+                genai.configure(api_key=clean_key)
                 model_inst = genai.GenerativeModel(formatted_model)
-                gen_config = genai.types.GenerationConfig(temperature=float(temperature))
+                gen_config = genai.types.GenerationConfig(temperature=float(temp))
                 response = model_inst.generate_content(prompt_text, generation_config=gen_config)
                 if response and response.text:
                     return response.text
             except Exception:
                 pass  # SDK失敗時はREST APIにフォールバック
 
-        # 2. REST API による直接呼び出し（新旧キー/AQ.キー/AIzaキー両対応）
+        # REST API 直接呼び出し（新旧キー/AQ.キー/AIzaキー両対応）
         headers = {
-            "x-goog-api-key": active_key,
+            "x-goog-api-key": clean_key,
             "Content-Type": "application/json"
         }
         payload = {
             "contents": [{"parts": [{"text": prompt_text}]}],
-            "generationConfig": {"temperature": float(temperature)}
+            "generationConfig": {"temperature": float(temp)}
         }
-        # v1beta → v1 の順で試行
         for api_version in ["v1beta", "v1"]:
-            # formatted_model は既に models/... を含んでいるため、URLにそのまま渡す
-            url = f"https://generativelanguage.googleapis.com/{api_version}/{formatted_model}:generateContent?key={active_key}"
+            url = f"https://generativelanguage.googleapis.com/{api_version}/{formatted_model}:generateContent?key={clean_key}"
             try:
                 res = requests.post(url, headers=headers, json=payload, timeout=60)
                 if res.status_code == 404:
@@ -456,24 +391,26 @@ def request_llm(prompt_text: str):
                 res.raise_for_status()
                 data = res.json()
                 return data["candidates"][0]["content"]["parts"][0]["text"]
-            except requests.exceptions.HTTPError as e:
+            except requests.exceptions.HTTPError:
                 if res.status_code == 404:
                     continue
-                return f"⚠️ Gemini APIエラー ({api_version}): {e}"
+                return f"⚠️ Gemini APIエラー ({api_version}): {res.text}"
             except Exception as e:
                 return f"⚠️ Gemini APIエラー: {e}"
-        return f"⚠️ Gemini APIエラー: モデル '{formatted_model}' が見つかりませんでした (404)。別のモデルをお試しください。"
 
-    elif llm_provider == "Groq API (高速クラウド)":
-        if not api_key:
-            return "⚠️ Groq APIキーが設定されていません。サイドバーに入力してください。"
+        return f"⚠️ Gemini APIエラー: モデル '{formatted_model}' が見つかりませんでした (404)。サイドバーで別のモデルをお試しください。"
+
+    elif provider == "Groq API (高速クラウド)":
+        clean_key = (current_api_key or "").strip()
+        if not clean_key:
+            return "⚠️ Groq APIキーが入力されていません。サイドバーに入力してください。"
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {clean_key}", "Content-Type": "application/json"}
         try:
             payload = {
-                "model": custom_model,
+                "model": model_name,
                 "messages": [{"role": "user", "content": prompt_text}],
-                "temperature": float(temperature)
+                "temperature": float(temp)
             }
             res = requests.post(url, headers=headers, json=payload, timeout=60)
             res.raise_for_status()
@@ -482,16 +419,17 @@ def request_llm(prompt_text: str):
             return f"⚠️ Groq APIエラー: {e}"
 
     else: # OpenAI互換
-        if not api_key:
-            return "⚠️ APIキーが設定されていません。サイドバーに入力してください。"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        clean_key = (current_api_key or "").strip()
+        if not clean_key:
+            return "⚠️ APIキーが入力されていません。サイドバーに入力してください。"
+        headers = {"Authorization": f"Bearer {clean_key}", "Content-Type": "application/json"}
         try:
             payload = {
-                "model": custom_model,
+                "model": model_name,
                 "messages": [{"role": "user", "content": prompt_text}],
-                "temperature": float(temperature)
+                "temperature": float(temp)
             }
-            res = requests.post(custom_url, headers=headers, json=payload, timeout=60)
+            res = requests.post(base_url, headers=headers, json=payload, timeout=60)
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"]
         except Exception as e:
@@ -701,7 +639,16 @@ with col_left:
         with c_btn:
             if st.button("🚀 AI分析を実行", type="primary", width="stretch"):
                 with st.spinner("AIアナリストが分析中..."):
-                    res = request_llm(analysis_prompt)
+                    active_model = ollama_model if llm_provider == "Ollama (ローカル)" else custom_model
+                    active_base_url = ollama_url if llm_provider == "Ollama (ローカル)" else custom_url
+                    res = request_llm(
+                        prompt_text=analysis_prompt,
+                        provider=llm_provider,
+                        current_api_key=api_key,
+                        model_name=active_model,
+                        temp=temperature,
+                        base_url=active_base_url
+                    )
                     st.session_state[session_analysis_key] = res
                     # タイムラインにAI判断を記録
                     verdict = "買い" if "買い" in res[:150] else ("売り" if "売り" in res[:150] else "様子見")
