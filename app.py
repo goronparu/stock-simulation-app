@@ -249,6 +249,17 @@ elif llm_provider == "Google Gemini API (クラウド)":
         type="password",
         help="Google AI Studio (https://aistudio.google.com/) で取得したご自身のAPIキーを入力してください"
     )
+
+    # APIキー入力時に利用可能なモデル一覧を確認・検証
+    if api_key.strip() and HAS_GENAI_SDK:
+        try:
+            genai.configure(api_key=api_key.strip())
+            models = [m.name for m in genai.list_models()]
+            with st.sidebar.expander("📋 現在このキーで利用可能なモデル一覧", expanded=False):
+                st.write(models)
+        except Exception as e:
+            st.sidebar.error(f"モデル一覧の取得に失敗（認証エラーの可能性）: {e}")
+
     gemini_options = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     selected_gemini_model = st.sidebar.selectbox("Gemini モデル", gemini_options, index=0)
     # 必ず models/ プレフィックスを付与して保持
